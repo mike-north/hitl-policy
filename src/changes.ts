@@ -1,5 +1,9 @@
 import { reportDiagnostic, runHostCallback } from './callbacks.js';
-import { isPolicyChangeOffer, isPolicyChangeOption, isPolicyChangeResponse } from './guards.js';
+import {
+  isPolicyChangeOffer,
+  isPolicyChangeOption,
+  isPolicyChangeResponseBatch,
+} from './guards.js';
 import type {
   DiagnosticReporter,
   GateInput,
@@ -9,7 +13,9 @@ import type {
   PolicyChangeContext,
   PolicyChangeOffer,
   PolicyChangeRequest,
+  PolicyChangeResponse,
 } from './types.js';
+import { LIMITS } from './types.js';
 
 function contextFor<TInput>(options: {
   readonly signal: AbortSignal;
@@ -97,6 +103,8 @@ export async function applyPolicyChanges<TOperation extends JsonValue, TModifica
   readonly offeredGeneration: number;
   readonly revision?: string;
   readonly currentGeneration: () => number;
+  /** Serializes the host atomic apply callback against snapshot replacement. */
+  readonly commit: (operation: () => Promise<boolean>) => Promise<boolean>;
   readonly signal?: AbortSignal;
   readonly timeoutMs: number;
   readonly diagnostics?: DiagnosticReporter;
@@ -109,8 +117,16 @@ export async function applyPolicyChanges<TOperation extends JsonValue, TModifica
   ) {
     return false;
   }
-  const responses = options.decisions.flatMap((record) => record.result.policyChanges ?? []);
-  if (responses.length === 0 || responses.some((response) => !isPolicyChangeResponse(response))) {
+  const responses: PolicyChangeResponse[] = [];
+  for (const record of options.decisions) {
+    for (const response of record.result.policyChanges ?? []) {
+      if (responses.length >= LIMITS.maxPolicyChangeResponses) {
+        return false;
+      }
+      responses.push(response);
+    }
+  }
+  if (responses.length === 0 || !isPolicyChangeResponseBatch(responses)) {
     return false;
   }
 
@@ -153,32 +169,31 @@ export async function applyPolicyChanges<TOperation extends JsonValue, TModifica
       prepared.push(result.value as TModification);
     }
 
-    if (options.currentGeneration() !== options.offeredGeneration) {
-      return false;
-    }
-    const applied = await runHostCallback(
-      (signal) =>
-        options.adapter?.apply(
-          prepared,
-          contextFor({
-            signal,
-            input: options.input,
+    return await options.commit(async () => {
+      const applied = await runHostCallback(
+        (signal) =>
+          options.adapter?.apply(
+            prepared,
+            contextFor({
+              signal,
+              input: options.input,
+              generation: options.offeredGeneration,
+              ...(options.revision === undefined ? {} : { revision: options.revision }),
+            }),
+          ),
+        { signal: controller.signal, timeoutMs: options.timeoutMs },
+      );
+      if (applied.status !== 'completed') {
+        if (applied.status === 'failed') {
+          reportDiagnostic(options.diagnostics, applied.error, {
+            phase: 'policy-change',
             generation: options.offeredGeneration,
-            ...(options.revision === undefined ? {} : { revision: options.revision }),
-          }),
-        ),
-      { signal: controller.signal, timeoutMs: options.timeoutMs },
-    );
-    if (applied.status !== 'completed') {
-      if (applied.status === 'failed') {
-        reportDiagnostic(options.diagnostics, applied.error, {
-          phase: 'policy-change',
-          generation: options.offeredGeneration,
-        });
+          });
+        }
+        return false;
       }
-      return false;
-    }
-    return applied.value !== false;
+      return applied.value !== false;
+    });
   } finally {
     options.signal?.removeEventListener('abort', abort);
   }

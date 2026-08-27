@@ -243,4 +243,52 @@ describe('policy modification choices and edits', () => {
     expect(changes.apply).toHaveBeenCalledOnce();
     expect(load).toHaveBeenCalledOnce();
   });
+
+  it('CHANGE-010 serializes snapshot reload with the host atomic apply callback', async () => {
+    const applyStarted = deferred<undefined>();
+    const releaseApply = deferred<undefined>();
+    let revision = 'r1';
+    const changes = changeAdapter({
+      apply: vi.fn(async () => {
+        applyStarted.resolve(undefined);
+        await releaseApply.promise;
+        revision = 'r2';
+        return true;
+      }),
+    });
+    const load = vi.fn(async () => ({ revision, state: { mode: 'ask' } }));
+    const approval = {
+      implicitRequirement: { authorityId: 'authority-1', approvalKey: 'operation-1' },
+      request: vi.fn(async () => ({
+        ...approvedDecision(),
+        policyChanges: [{ schemaVersion: 1, type: 'choice', optionId: 'allow-read' }],
+      })),
+    };
+    const gate = makeGate({
+      policy: {
+        initial: { revision, state: { mode: 'ask' } },
+        load,
+        evaluate: async () => askPolicy(),
+      },
+      hitl: approval,
+      policyChanges: changes,
+    });
+
+    const evaluation = gate.evaluate(makeInput());
+    await applyStarted.promise;
+    const concurrentReload = gate.reload();
+    await Promise.resolve();
+
+    expect(load).not.toHaveBeenCalled();
+    releaseApply.resolve(undefined);
+
+    await expect(evaluation).resolves.toMatchObject({ state: 'satisfied', generation: 0 });
+    await expect(concurrentReload).resolves.toMatchObject({
+      status: 'updated',
+      generation: 1,
+      revision: 'r2',
+    });
+    expect(load).toHaveBeenCalledOnce();
+    expect(gate.generation).toBe(1);
+  });
 });

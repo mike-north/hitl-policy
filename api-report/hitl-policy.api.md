@@ -321,6 +321,7 @@ export const LIMITS: {
     readonly maxDisplayCodeUnits: 16384;
     readonly maxHumanTimeoutMs: 86400000;
     readonly maxHostCallbackTimeoutMs: 60000;
+    readonly maxPolicyChangeResponses: 100;
     readonly maxTimerMs: 2147483647;
 };
 

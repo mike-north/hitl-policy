@@ -20,6 +20,7 @@ export const LIMITS = {
   maxDisplayCodeUnits: 16_384,
   maxHumanTimeoutMs: 86_400_000,
   maxHostCallbackTimeoutMs: 60_000,
+  maxPolicyChangeResponses: 100,
   maxTimerMs: 2_147_483_647,
 } as const;
 

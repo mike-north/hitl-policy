@@ -17,14 +17,15 @@ when it checks both the returned value and the absence/presence of forbidden sid
 
 ## Steel threads
 
-| ID       | Requirement       | Expected assertion                                                                                        |
-| -------- | ----------------- | --------------------------------------------------------------------------------------------------------- |
-| GATE-001 | Policy-only allow | `createGate({ policy })` returns `state: "satisfied"` without a HITL capability or request.               |
-| GATE-002 | Policy-only deny  | Deny is `unsatisfied` and never prompts.                                                                  |
-| GATE-003 | HITL-only         | Absent policy produces implicit ask and succeeds only after the implicit HITL request approves.           |
-| GATE-004 | Missing HITL      | Absent policy plus absent HITL fails closed with `hitl-unavailable`.                                      |
-| GATE-005 | Mixed terminal    | Mixed allow/deny never invokes HITL and maps to satisfied/unsatisfied respectively.                       |
-| GATE-006 | Mixed ask         | Ask invokes HITL; approval may satisfy the gate but does not rewrite the retained policy result to allow. |
+| ID       | Requirement       | Expected assertion                                                                                                                                                                                          |
+| -------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GATE-001 | Policy-only allow | `createGate({ policy })` returns `state: "satisfied"` without a HITL capability or request.                                                                                                                 |
+| GATE-002 | Policy-only deny  | Deny is `unsatisfied` and never prompts.                                                                                                                                                                    |
+| GATE-003 | HITL-only         | Absent policy produces implicit ask and succeeds only after the implicit HITL request approves.                                                                                                             |
+| GATE-004 | Missing HITL      | Absent policy plus absent HITL fails closed with `hitl-unavailable`.                                                                                                                                        |
+| GATE-005 | Mixed terminal    | Mixed allow/deny never invokes HITL and maps to satisfied/unsatisfied respectively.                                                                                                                         |
+| GATE-006 | Mixed ask         | Ask invokes HITL; approval may satisfy the gate but does not rewrite the retained policy result to allow.                                                                                                   |
+| GATE-007 | Fresh deadline    | The gate re-reads its clock immediately before provider invocation while preserving the request's original timestamp, so work that expires during policy/change-offer callbacks never reaches the provider. |
 
 ## Reload and generation
 
@@ -61,16 +62,18 @@ when it checks both the returned value and the absence/presence of forbidden sid
 
 ## Policy changes and editable drafts
 
-| ID         | Requirement         | Expected assertion                                                                                                                                    |
-| ---------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CHANGE-001 | Host choices        | Offers are requested, multiple selected choices are prepared, and all are atomically applied once.                                                    |
-| CHANGE-002 | Namespaced edit     | An editable `{ namespace, kind, value }` draft is passed to prepare before application.                                                               |
-| CHANGE-003 | Negative decisions  | Rejection, timeout, and provider failure never prepare or apply changes.                                                                              |
-| CHANGE-004 | Independent failure | Malformed/unauthorized changes, including one malformed item in a mixed batch, leave the current one-shot result satisfied/unchanged and never apply. |
-| CHANGE-005 | Stale generation    | Changes selected against an old generation are discarded and not applied.                                                                             |
-| CHANGE-006 | Future-only apply   | Accepted changes apply once, reload once, and never change the current result's retained policy decision.                                             |
-| CHANGE-007 | Atomic preparation  | Any failed preparation discards the complete selected batch and never calls atomic apply.                                                             |
-| CHANGE-008 | Reload independence | A failed reload after successful atomic apply does not change the already-computed one-shot result.                                                   |
+| ID         | Requirement         | Expected assertion                                                                                                                                                                       |
+| ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CHANGE-001 | Host choices        | Offers are requested, multiple selected choices are prepared, and all are atomically applied once.                                                                                       |
+| CHANGE-002 | Namespaced edit     | An editable `{ namespace, kind, value }` draft is passed to prepare before application.                                                                                                  |
+| CHANGE-003 | Negative decisions  | Rejection, timeout, and provider failure never prepare or apply changes.                                                                                                                 |
+| CHANGE-004 | Independent failure | Malformed/unauthorized changes, including one malformed item in a mixed batch, leave the current one-shot result satisfied/unchanged and never apply.                                    |
+| CHANGE-005 | Stale generation    | Changes selected against an old generation are discarded and not applied.                                                                                                                |
+| CHANGE-006 | Future-only apply   | Accepted changes apply once, reload once, and never change the current result's retained policy decision.                                                                                |
+| CHANGE-007 | Atomic preparation  | Any failed preparation discards the complete selected batch and never calls atomic apply.                                                                                                |
+| CHANGE-008 | Reload independence | A failed reload after successful atomic apply does not change the already-computed one-shot result.                                                                                      |
+| CHANGE-009 | Bounded batch       | At most 100 policy-change responses are retained, and the complete batch must fit the aggregate JSON boundary; an oversized batch is discarded without changing the one-shot decision.   |
+| CHANGE-010 | Apply serialization | Snapshot generation cannot advance while the host atomic `apply` callback runs; a concurrent reload waits and then observes the applied policy instead of coalescing with stale loading. |
 
 ## Multi-authority and host boundaries
 
@@ -84,7 +87,7 @@ are adapter-owned tests because they are not implemented by this package.
 
 The issue's package/export criteria map to `G-004..006`; L0 normalization to `L0-004`,
 `L0-008`, `L0-010`, `L0-011`, and `FAIL-001`; policy-only/HITL/mixed behavior to `GATE-001..006`;
-reload to `RELOAD-001..006`; assurance to `ASSURE-001..002`; policy re-evaluation to
-`RECHECK-001..004`; and policy changes to `CHANGE-001..008`. The remaining issue documentation and
+reload to `RELOAD-001..007`; assurance to `ASSURE-001..002`; policy re-evaluation to
+`RECHECK-001..004`; and policy changes to `CHANGE-001..010`. The remaining issue documentation and
 release criteria are checked by the package-boundary, built-portability, README, and release-policy
 tests. No allw integration is required for core package conformance.

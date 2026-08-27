@@ -147,7 +147,8 @@ class GateImplementation<
     if (!isGateInput(input)) {
       return this.#remember(this.#unsatisfied(input, 'invalid-input', failedPolicy(snapshot)));
     }
-    const nowMs = options.nowMs?.() ?? this.#config.nowMs?.() ?? Date.now();
+    const clock = options.nowMs ?? this.#config.nowMs ?? Date.now;
+    const nowMs = clock();
     if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
       return this.#remember(this.#unsatisfied(input, 'invalid-input', failedPolicy(snapshot)));
     }
@@ -211,7 +212,8 @@ class GateImplementation<
       hitl,
       requirements: normalized.requirements,
       input,
-      nowMs,
+      requestedAtMs: nowMs,
+      nowMs: clock,
       timeoutMs,
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(this.#config.diagnostics === undefined ? {} : { diagnostics: this.#config.diagnostics }),
@@ -277,6 +279,10 @@ class GateImplementation<
       offeredGeneration,
       ...revisionFields(initial.policy.revision),
       currentGeneration: () => this.generation,
+      commit: async (operation) => {
+        const committed = await this.#snapshots.runWhileCurrent(offeredGeneration, operation);
+        return committed.status === 'completed' && committed.value;
+      },
       ...(options.signal === undefined ? {} : { signal: options.signal }),
       timeoutMs: callbackTimeoutMs,
       ...(this.#config.diagnostics === undefined ? {} : { diagnostics: this.#config.diagnostics }),

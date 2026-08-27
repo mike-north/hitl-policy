@@ -105,6 +105,30 @@ describe('createGate steel threads', () => {
     expect(result).not.toHaveProperty('decision', 'allow');
     expect(result).toHaveProperty('human');
   });
+
+  it('GATE-007 re-reads the clock before provider invocation and preserves the request timestamp', async () => {
+    const request = vi.fn(async () => approvedDecision());
+    const nowMs = vi
+      .fn()
+      .mockReturnValueOnce(NOW)
+      .mockReturnValueOnce(NOW + 1_001);
+    const gate = makeGate({
+      policy: { evaluate: async () => askPolicy() },
+      hitl: hitl({ request }),
+    });
+
+    const result = await gate.evaluate(makeInput({ timeoutMs: 1_000 }), { nowMs });
+
+    expect(result).toMatchObject({
+      state: 'unsatisfied',
+      failure: 'decision-timeout',
+      human: {
+        decisions: [{ request: { requestedAtMs: NOW, timeoutMs: 1_000 } }],
+      },
+    });
+    expect(nowMs).toHaveBeenCalledTimes(2);
+    expect(request).not.toHaveBeenCalled();
+  });
 });
 
 describe('reload snapshots and generation', () => {

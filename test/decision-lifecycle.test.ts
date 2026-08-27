@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DecisionResult } from '../src/index.ts';
-import { invokeDecision, isDecisionResult } from '../src/index.ts';
+import { invokeDecision, isDecisionResult, LIMITS } from '../src/index.ts';
 import { deferred } from './helpers.ts';
 
 const NOW = 100_000;
@@ -128,6 +128,53 @@ describe('versioned decision boundary lifecycle', () => {
       policyChanges: [{ schemaVersion: 2, type: 'choice', optionId: 'invented' }],
     }));
 
+    const result = await invokeDecision(decisionProvider, request(), { nowMs: () => NOW });
+    expect(result.decision.state).toBe('approved');
+    expect(result.policyChanges).toBeUndefined();
+    expect(isDecisionResult(result)).toBe(true);
+  });
+
+  it('CHANGE-009 bounds policy-change count and aggregate JSON without changing the decision', async () => {
+    const policyChanges = Array.from(
+      { length: LIMITS.maxPolicyChangeResponses + 1 },
+      (_, index) =>
+        ({ schemaVersion: 1, type: 'choice', optionId: `option-${String(index)}` }) as const,
+    );
+    const aggregateOverLimit = Array.from(
+      { length: LIMITS.maxPolicyChangeResponses },
+      (_, index) =>
+        ({
+          schemaVersion: 1,
+          type: 'edit',
+          draft: {
+            namespace: 'example.policy',
+            kind: `kind-${String(index)}`,
+            value: 'x'.repeat(3_000),
+          },
+        }) as const,
+    );
+    const decisionProvider = provider(async () => ({
+      schemaVersion: 1,
+      decision: { state: 'approved' },
+      policyChanges,
+    }));
+
+    expect(
+      isDecisionResult({
+        schemaVersion: 1,
+        decision: { state: 'approved' },
+        policyChanges: policyChanges.slice(0, LIMITS.maxPolicyChangeResponses),
+      }),
+    ).toBe(true);
+    for (const oversized of [policyChanges, aggregateOverLimit]) {
+      expect(
+        isDecisionResult({
+          schemaVersion: 1,
+          decision: { state: 'approved' },
+          policyChanges: oversized,
+        }),
+      ).toBe(false);
+    }
     const result = await invokeDecision(decisionProvider, request(), { nowMs: () => NOW });
     expect(result.decision.state).toBe('approved');
     expect(result.policyChanges).toBeUndefined();

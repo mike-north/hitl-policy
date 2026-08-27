@@ -23,6 +23,10 @@ export type PolicySnapshot<TPolicy> =
       readonly generation: number;
     };
 
+/** Result of an operation serialized against snapshot replacement. */
+export type CurrentGenerationResult<T> =
+  { readonly status: 'completed'; readonly value: T } | { readonly status: 'stale' };
+
 function initialSnapshot<TInput, TPolicy>(
   adapter: PolicyAdapter<TInput, TPolicy> | undefined,
 ): PolicySnapshot<TPolicy> {
@@ -56,6 +60,13 @@ function sameSnapshot<TPolicy>(
   return current.kind === nextKind && current.revision === loaded.revision;
 }
 
+/** Preserves Error objects and safely wraps non-Error promise rejection reasons. */
+function mutationError(reason: unknown): Error {
+  return reason instanceof Error
+    ? reason
+    : new Error('snapshot mutation failed', { cause: reason });
+}
+
 /** Owns atomic snapshot replacement and coalesced reload operations. */
 export class SnapshotStore<TInput, TPolicy> {
   readonly #adapter: PolicyAdapter<TInput, TPolicy> | undefined;
@@ -63,6 +74,8 @@ export class SnapshotStore<TInput, TPolicy> {
   readonly #defaultTimeoutMs: number;
   #snapshot: PolicySnapshot<TPolicy>;
   #inFlight: Promise<ReloadResult> | undefined;
+  #mutationActive = false;
+  readonly #mutationQueue: (() => void)[] = [];
 
   constructor(options: {
     readonly adapter: PolicyAdapter<TInput, TPolicy> | undefined;
@@ -87,13 +100,71 @@ export class SnapshotStore<TInput, TPolicy> {
     if (this.#inFlight !== undefined) {
       return this.#inFlight;
     }
-    const operation = this.#performReload(options).finally(() => {
+    const operation = this.#serializeMutation(() => this.#performReload(options)).finally(() => {
       if (this.#inFlight === operation) {
         this.#inFlight = undefined;
       }
     });
     this.#inFlight = operation;
     return operation;
+  }
+
+  /**
+   * Runs an external mutation only if its generation is still current while
+   * preventing reload from replacing the snapshot until that mutation settles.
+   */
+  runWhileCurrent<T>(
+    generation: number,
+    operation: () => Promise<T>,
+  ): Promise<CurrentGenerationResult<T>> {
+    return this.#serializeMutation(async () => {
+      if (this.#snapshot.generation !== generation) {
+        return { status: 'stale' };
+      }
+      return { status: 'completed', value: await operation() };
+    });
+  }
+
+  /** Starts uncontended mutations synchronously and queues later mutations FIFO. */
+  #serializeMutation<T>(operation: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const run = (): void => {
+        this.#mutationActive = true;
+        let result: Promise<T>;
+        try {
+          result = operation();
+        } catch (error: unknown) {
+          this.#releaseMutation();
+          reject(mutationError(error));
+          return;
+        }
+        void result.then(
+          (value) => {
+            this.#releaseMutation();
+            resolve(value);
+          },
+          (error: unknown) => {
+            this.#releaseMutation();
+            reject(mutationError(error));
+          },
+        );
+      };
+      if (this.#mutationActive) {
+        this.#mutationQueue.push(run);
+      } else {
+        run();
+      }
+    });
+  }
+
+  /** Releases one mutation and immediately starts the next queued operation. */
+  #releaseMutation(): void {
+    const next = this.#mutationQueue.shift();
+    if (next === undefined) {
+      this.#mutationActive = false;
+    } else {
+      next();
+    }
   }
 
   async #performReload(options: ReloadOptions): Promise<ReloadResult> {

@@ -359,9 +359,7 @@ function hasValidDecisionResult(value: unknown, validateChanges: boolean): value
   return (
     schemaVersion === 1 &&
     isDecisionOutcome(decision) &&
-    (!validateChanges ||
-      policyChanges === undefined ||
-      (Array.isArray(policyChanges) && policyChanges.every(isPolicyChangeResponse)))
+    (!validateChanges || policyChanges === undefined || isPolicyChangeResponseBatch(policyChanges))
   );
 }
 
@@ -467,6 +465,23 @@ export function isPolicyChangeResponse(value: unknown): value is PolicyChangeRes
     return isBoundedString(readDataProperty(value, 'optionId'), LIMITS.maxIdentifierCodeUnits);
   }
   return type === 'edit' && isPolicyDraft(readDataProperty(value, 'draft'));
+}
+
+/**
+ * Validates the count and aggregate JSON budget for one provider-authored
+ * policy-change batch before any host preparation callbacks can run.
+ *
+ * @internal
+ */
+export function isPolicyChangeResponseBatch(
+  value: unknown,
+): value is readonly PolicyChangeResponse[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= LIMITS.maxPolicyChangeResponses &&
+    isJsonValue(value) &&
+    value.every(isPolicyChangeResponse)
+  );
 }
 
 /** Validates a host-authored offer before it crosses the provider boundary. */

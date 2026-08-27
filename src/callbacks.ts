@@ -1,4 +1,4 @@
-import { hasValidDecision, isDecisionRequest, isPolicyChangeResponse } from './guards.js';
+import { hasValidDecision, isDecisionRequest, isPolicyChangeResponseBatch } from './guards.js';
 import type {
   DecisionInvocationOptions,
   DecisionProvider,
@@ -148,10 +148,11 @@ function normalizeProviderResult(value: unknown): DecisionResult | undefined {
   const decision = readOwnDataProperty(value, 'decision') as DecisionResult['decision'];
   const evidence = readOwnDataProperty(value, 'evidence');
   const proposedChanges = readOwnDataProperty(value, 'policyChanges');
-  const policyChanges: readonly PolicyChangeResponse[] | undefined =
-    Array.isArray(proposedChanges) && proposedChanges.every(isPolicyChangeResponse)
-      ? proposedChanges
-      : undefined;
+  const policyChanges: readonly PolicyChangeResponse[] | undefined = isPolicyChangeResponseBatch(
+    proposedChanges,
+  )
+    ? proposedChanges
+    : undefined;
 
   // Rebuild a plain result without invoking optional accessors. If any change
   // is malformed, discard the whole optional batch while retaining the valid

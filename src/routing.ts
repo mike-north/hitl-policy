@@ -145,7 +145,10 @@ export async function requestHumanDecisions<TOperation extends JsonValue>(option
   readonly hitl: HitlAdapter<TOperation>;
   readonly requirements: readonly ApprovalRequirement[];
   readonly input: GateInput<TOperation>;
-  readonly nowMs: number;
+  /** Timestamp retained on requests which omit an explicit requestedAtMs. */
+  readonly requestedAtMs: number;
+  /** Clock re-read by invokeDecision immediately before calling each provider. */
+  readonly nowMs: () => number;
   readonly timeoutMs: number;
   readonly signal?: AbortSignal;
   readonly diagnostics?: DiagnosticReporter;
@@ -163,7 +166,7 @@ export async function requestHumanDecisions<TOperation extends JsonValue>(option
     const request = buildDecisionRequest({
       input: options.input,
       requirement,
-      nowMs: options.nowMs,
+      nowMs: options.requestedAtMs,
       timeoutMs: options.timeoutMs,
       counter: options.nextCounter(),
       ...(options.policyChange === undefined ? {} : { policyChange: options.policyChange }),
@@ -177,7 +180,7 @@ export async function requestHumanDecisions<TOperation extends JsonValue>(option
     }
     const result = await invokeDecision(provider, request, {
       ...(options.signal === undefined ? {} : { signal: options.signal }),
-      nowMs: () => options.nowMs,
+      nowMs: options.nowMs,
       ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
     });
     return {
