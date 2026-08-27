@@ -237,6 +237,10 @@ the diagnostic sink. Approved cannot carry a failure; explicit rejection remains
 from provider/channel failure. A configured `verify` callback is a mandatory negative gate.
 Gate-created provider requests are detached, deeply frozen snapshots, so provider code cannot
 rewrite the operation or approval key retained for policy recheck, evidence verification, or audit.
+Accepted timestamps leave enough safe-integer headroom for the maximum human timeout, so every
+validated request also has a representable deadline.
+Clock exceptions and accessor-backed provider registration fields normalize fail-closed without
+invocation; provider IDs and request methods are captured once before untrusted code runs.
 
 ### 2.4 Policy changes and gate
 
@@ -387,15 +391,20 @@ change batch is malformed or any preparation fails, the entire optional batch is
 4. Requirements with equal authority, approval key, and compatible route coalesce. Different
    authorities remain conjunctive. Conflicting routes fail `route-conflict`; unavailable routes
    fail `route-unavailable`.
-5. Each distinct requirement is requested once. Rejection, timeout, provider failure, malformed
-   result, missing provider, or failed verification is unsatisfied.
+5. Each distinct requirement is requested once. Immediately before each provider invocation, the
+   gate re-reads its clock and compares it with the request's original timestamp and deadline.
+   Rejection, timeout, provider failure, malformed result, missing provider, or failed verification
+   is unsatisfied.
 6. After approval, the current policy is re-evaluated. Latest allow satisfies and latest deny
    blocks. Latest ask may reuse only approvals with matching authority, approval key, and compatible
    route. Removed obligations are harmless; new or changed obligations return `policy-changed`
    without automatic re-prompting. At most three generation-change restarts are attempted before
    `policy-unstable`.
 7. Approved policy changes are offered, prepared, and atomically applied only for the current
-   generation, then cause one reload. Their effect is future-only; they never change this result.
+   generation, then cause one reload. A provider response batch is limited to 100 entries and the
+   aggregate JSON boundary. Generation replacement is serialized with the host atomic `apply`
+   callback so it cannot change across that external write. Their effect is future-only; they never
+   change this result.
 8. A configured audit callback must succeed before returning satisfied. `isCurrent` remains a
    generation check, not a transaction lock.
 
@@ -405,7 +414,11 @@ change batch is malformed or any preparation fails, the entire optional batch is
 load with a changed host revision returns `updated` and increments generation exactly once. The
 same revision returns `unchanged` without incrementing. Failed load or invalid state returns
 `failed`, emits diagnostics, and retains the last good snapshot. Policy absence is a successful
-loaded state with `state: undefined`.
+loaded state with `state: undefined`. Invalid per-call callback timeouts normalize to the bounded
+host callback default before `policy.load` is invoked, matching evaluation callback behavior.
+Reloads that arrive during a standing-policy atomic apply wait until that callback settles. The
+first subsequent load therefore observes the applied host state, and concurrent reload callers may
+coalesce with that post-apply load.
 
 An in-flight approval from an old generation is reusable only when the current re-evaluation has
 matching obligations; any standing-policy selection attached to it is still discarded as stale.
@@ -423,7 +436,8 @@ the exact `GateFailure` values above. Raw exceptions never appear in client-safe
 
 Human timeout is at most 86,400,000 ms, host callback timeout at most 60,000 ms, and platform
 timers at most 2,147,483,647 ms. JSON depth is 32, nodes 10,000, object keys 10,000, total string
-code units 262,144; IDs are 256 code units and display text 16,384 code units.
+code units 262,144; IDs are 256 code units, display text is 16,384 code units, and one approved
+provider result may contain at most 100 policy-change responses.
 
 ## 6. Versioning and completion
 

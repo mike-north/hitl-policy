@@ -206,8 +206,10 @@ const gate = createGate({ policy, hitl, policyChanges });
 Choice/edit responses carry `schemaVersion: 1` because they cross the provider boundary. Embedded
 requirements, caller identity, policy evaluations, and opaque policy state are host-local and are
 not redundantly versioned. Changes apply only after an explicitly approved, verified, audited
-decision; stale, malformed, rejected, or failed changes are discarded. After atomic apply the gate
-reloads once. The current one-shot result never changes; only future evaluations see the policy.
+decision; stale, malformed, rejected, or failed changes are discarded. A response batch contains at
+most 100 changes and must fit the package's aggregate JSON boundary. Snapshot reloads wait while the
+host atomic `apply` callback runs; after apply the gate reloads once. The current one-shot result
+never changes; only future evaluations see the policy.
 
 ## Evidence, audit, and failure safety
 
