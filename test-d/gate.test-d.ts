@@ -10,7 +10,7 @@ import type {
   PolicyChangeAdapter,
 } from 'hitl-policy';
 import { expectError, expectNotAssignable, expectType } from 'tsd';
-import { createGate, LIMITS } from 'hitl-policy';
+import { createGate, invokeDecision, LIMITS } from 'hitl-policy';
 
 // The unified package does not expose legacy layer-specific limit aliases.
 expectError(LIMITS.maxL0TimeoutMs);
@@ -25,6 +25,16 @@ const provider: DecisionProvider = {
   providerId: 'provider-1',
   request: async () => ({ schemaVersion: 1, decision: { state: 'approved' } }),
 };
+expectError(
+  invokeDecision(
+    {
+      apiVersion: 1,
+      providerId: 'legacy-provider',
+      requestDecision: async () => ({ schemaVersion: 1, decision: { state: 'approved' } }),
+    },
+    {},
+  ),
+);
 const policy: PolicyAdapter = {
   apiVersion: 1,
   evaluate: async () => ({ decision: 'allow', source: 'directive' }),

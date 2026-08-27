@@ -271,7 +271,7 @@ export interface HumanResolution {
 }
 
 // @public
-export function invokeDecision(provider: unknown, request: unknown, options?: DecisionInvocationOptions): Promise<DecisionResult>;
+export function invokeDecision(provider: DecisionProvider | undefined, request: unknown, options?: DecisionInvocationOptions): Promise<DecisionResult>;
 
 // @public
 export function isApprovalRequirement(value: unknown): value is ApprovalRequirement;

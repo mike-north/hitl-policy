@@ -1,6 +1,7 @@
 import { hasValidDecision, isDecisionRequest, isPolicyChangeResponse } from './guards.js';
 import type {
   DecisionInvocationOptions,
+  DecisionProvider,
   DecisionRequest,
   DecisionResult,
   DiagnosticContext,
@@ -169,6 +170,11 @@ function normalizeProviderResult(value: unknown): DecisionResult | undefined {
  *
  * @public
  */
+export function invokeDecision(
+  provider: DecisionProvider | undefined,
+  request: unknown,
+  options?: DecisionInvocationOptions,
+): Promise<DecisionResult>;
 export async function invokeDecision(
   provider: unknown,
   request: unknown,
@@ -198,17 +204,12 @@ export async function invokeDecision(
     return normalizedDecision('rejected', 'provider-unavailable');
   }
   const providerRecord = provider as Record<string, unknown>;
-  const requestMethod =
-    typeof providerRecord.request === 'function'
-      ? providerRecord.request
-      : typeof providerRecord.requestDecision === 'function'
-        ? providerRecord.requestDecision
-        : undefined;
+  const requestMethod = providerRecord.request;
   if (
     providerRecord.apiVersion !== 1 ||
     typeof providerRecord.providerId !== 'string' ||
     providerRecord.providerId.length === 0 ||
-    requestMethod === undefined
+    typeof requestMethod !== 'function'
   ) {
     return normalizedDecision('rejected', 'provider-unavailable');
   }

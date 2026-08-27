@@ -3,6 +3,7 @@ import { isApprovalRequirement, isDecisionRequest } from './guards.js';
 import type {
   ApprovalDecisionRequest,
   ApprovalRequirement,
+  DecisionProvider,
   DecisionResult,
   DiagnosticReporter,
   GateFailure,
@@ -112,7 +113,7 @@ function providerForRequirement<TOperation extends JsonValue>(
   hitl: HitlAdapter<TOperation>,
   requirement: ApprovalRequirement,
   diagnostics: DiagnosticReporter | undefined,
-): unknown {
+): DecisionProvider<TOperation> | undefined {
   if (hitl.route !== undefined) {
     try {
       const routed = hitl.route(requirement);

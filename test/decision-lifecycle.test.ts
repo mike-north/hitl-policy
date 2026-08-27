@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { DecisionResult } from '../src/index.ts';
 import { invokeDecision, isDecisionResult } from '../src/index.ts';
 import { deferred } from './helpers.ts';
 
@@ -19,11 +20,14 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 function provider(requestDecision: (signal: AbortSignal) => Promise<unknown>) {
+  // These lifecycle tests intentionally feed malformed JavaScript results through
+  // the provider boundary, so only the mock result bypasses its static type.
   return {
-    apiVersion: 1,
+    apiVersion: 1 as const,
     providerId: 'provider-1',
-    request: vi.fn(async (_request: unknown, context: { signal: AbortSignal }) =>
-      requestDecision(context.signal),
+    request: vi.fn(
+      async (_request: unknown, context: { signal: AbortSignal }) =>
+        (await requestDecision(context.signal)) as DecisionResult,
     ),
   };
 }

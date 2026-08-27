@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DecisionProvider } from '../src/index.ts';
 import {
   LIMITS,
   invokeDecision,
@@ -7,7 +8,7 @@ import {
   isDecisionResult,
   isJsonValue,
 } from '../src/index.ts';
-import { cyclicValue, manyKeys, nestedObject } from './helpers.ts';
+import { approvedDecision, cyclicValue, manyKeys, nestedObject } from './helpers.ts';
 
 function request(overrides: Record<string, unknown> = {}) {
   return {
@@ -22,6 +23,12 @@ function request(overrides: Record<string, unknown> = {}) {
     timeoutMs: 1_000,
     ...overrides,
   };
+}
+
+function invokeUntrustedProvider(provider: unknown) {
+  // Runtime guards must still reject malformed JavaScript providers even though
+  // the public TypeScript signature admits only the documented provider shape.
+  return invokeDecision(provider as never, request(), { nowMs: () => 100_000 });
 }
 
 describe('G-001/G-002/G-003 bounded boundary guards', () => {
@@ -101,9 +108,7 @@ describe('G-001/G-002/G-003 bounded boundary guards', () => {
     };
 
     expect(isDecisionResult(providerResult)).toBe(false);
-    await expect(
-      invokeDecision(provider, request(), { nowMs: () => 100_000 }),
-    ).resolves.toMatchObject({
+    await expect(invokeUntrustedProvider(provider)).resolves.toMatchObject({
       decision: { state: 'rejected', failure: 'malformed-result' },
     });
     expect(getterInvoked).toBe(false);
@@ -117,20 +122,34 @@ describe('L0 failure normalization', () => {
       providerId: 'provider',
       request: vi.fn(async () => ({ schemaVersion: 1, decision: { state: 'approved' } })),
     };
-    await expect(
-      invokeDecision(provider, request(), { nowMs: () => 100_000 }),
-    ).resolves.toMatchObject({
+    await expect(invokeUntrustedProvider(provider)).resolves.toMatchObject({
       decision: { state: 'rejected', failure: 'provider-unavailable' },
     });
     expect(provider.request).not.toHaveBeenCalled();
+  });
+
+  it('L0-008 rejects an undocumented requestDecision provider method', async () => {
+    const provider = {
+      apiVersion: 1,
+      providerId: 'provider',
+      requestDecision: vi.fn(async () => ({
+        schemaVersion: 1,
+        decision: { state: 'approved' },
+      })),
+    };
+
+    await expect(invokeUntrustedProvider(provider)).resolves.toMatchObject({
+      decision: { state: 'rejected', failure: 'provider-unavailable' },
+    });
+    expect(provider.requestDecision).not.toHaveBeenCalled();
   });
 
   it('L0-004 classifies invalid deadline values as invalid-request rather than deadline-exceeded', async () => {
     const provider = {
       apiVersion: 1,
       providerId: 'provider',
-      request: vi.fn(async () => ({ schemaVersion: 1, decision: { state: 'approved' } })),
-    };
+      request: vi.fn(async () => approvedDecision()),
+    } satisfies DecisionProvider;
     for (const timeoutMs of [
       0,
       -1,
@@ -155,7 +174,7 @@ describe('L0 failure normalization', () => {
       apiVersion: 1,
       providerId: 'provider',
       request: vi.fn(async () => Promise.reject(error)),
-    };
+    } satisfies DecisionProvider;
     const result = await invokeDecision(provider, request(), {
       diagnostics,
       nowMs: () => 100_000,
@@ -174,12 +193,8 @@ describe('L0 failure normalization', () => {
     const provider = {
       apiVersion: 1,
       providerId: 'provider',
-      request: vi.fn(async () => ({
-        schemaVersion: 1,
-        decision: { state: 'approved' },
-        evidence,
-      })),
-    };
+      request: vi.fn(async () => approvedDecision(evidence)),
+    } satisfies DecisionProvider;
     const result = await invokeDecision(provider, request(), { nowMs: () => 100_000 });
     expect(result.evidence).toBe(evidence);
   });
