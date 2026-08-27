@@ -1,7 +1,7 @@
 /**
- * Creates the single policy-only, HITL-only, or mixed integration surface.
- *
  * @packageDocumentation
+ *
+ * Creates the single policy-only, HITL-only, or mixed integration surface.
  */
 
 export { invokeDecision } from './callbacks.js';

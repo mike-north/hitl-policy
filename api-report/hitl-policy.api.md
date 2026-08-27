@@ -536,6 +536,4 @@ export interface UnsatisfiedGateResult<TOperation extends JsonValue = JsonValue>
     readonly state: 'unsatisfied';
 }
 
-// (No @packageDocumentation comment for this package)
-
 ```

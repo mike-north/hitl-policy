@@ -15,6 +15,8 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | G-005 | Export boundary | `package.json` exports `.`, `./conformance`, and package metadata only; old L0–L3 paths are absent.                                                                                                  |
 | G-006 | Portable build  | Built root and conformance declarations import without filesystem, network, crypto, native, or WASM dependencies in Node and a browser/worker-like runtime.                                          |
 | G-007 | JS typecheck    | Root TypeScript checking includes and checks JavaScript configuration and release-script inputs rather than silently ignoring the included files.                                                    |
+| G-008 | Workspace root  | `pnpm-workspace.yaml` explicitly includes the root package so install/build behavior does not depend on an implicit empty workspace.                                                                 |
+| G-009 | Package docs    | The built declaration and API Extractor report retain the root `@packageDocumentation` block.                                                                                                        |
 
 ## Steel threads
 
@@ -87,7 +89,7 @@ are adapter-owned tests because they are not implemented by this package.
 
 ## Issue traceability
 
-The issue's package/export criteria map to `G-004..007`; L0 normalization to `L0-004`,
+The issue's package/export criteria map to `G-004..009`; L0 normalization to `L0-004`,
 `L0-008`, `L0-010`, `L0-011`, and `FAIL-001..002`; policy-only/HITL/mixed behavior to `GATE-001..007`;
 reload to `RELOAD-001..007`; assurance to `ASSURE-001..002`; policy re-evaluation to
 `RECHECK-001..004`; and policy changes to `CHANGE-001..010`. The remaining issue documentation and

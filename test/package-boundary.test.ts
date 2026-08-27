@@ -12,6 +12,8 @@ const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), '
 const tsconfig = JSON.parse(readFileSync(join(projectRoot, 'tsconfig.json'), 'utf8')) as {
   compilerOptions?: { allowJs?: boolean; checkJs?: boolean };
 };
+const workspaceConfig = readFileSync(join(projectRoot, 'pnpm-workspace.yaml'), 'utf8');
+const apiReport = readFileSync(join(projectRoot, 'api-report/hitl-policy.api.md'), 'utf8');
 
 describe('G-005 package boundary', () => {
   it('publishes one root integration surface and the conformance subpath', () => {
@@ -57,5 +59,17 @@ describe('G-005 package boundary', () => {
 
   it('G-007 typechecks included JavaScript configuration and release scripts', () => {
     expect(tsconfig.compilerOptions).toMatchObject({ allowJs: true, checkJs: true });
+  });
+
+  it('G-008 explicitly includes the root package in the pnpm workspace', () => {
+    expect(workspaceConfig).toMatch(/^packages:\n\s+- ['"]?\.['"]?$/m);
+  });
+
+  it('G-009 retains package documentation in the API report', () => {
+    expect(apiReport).not.toContain('No @packageDocumentation comment for this package');
+    const builtDeclaration = join(projectRoot, 'dist/index.d.ts');
+    if (existsSync(builtDeclaration)) {
+      expect(readFileSync(builtDeclaration, 'utf8')).toContain('@packageDocumentation');
+    }
   });
 });
