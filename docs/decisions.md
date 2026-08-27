@@ -32,7 +32,8 @@ replacement and a last-good snapshot provide predictable failure behavior.
 
 **Decision:** Generation starts at zero and increments exactly once when a successful reload changes
 policy presence or the host revision. Same-presence, same-revision reload is `unchanged`; failures
-preserve the old generation. `isCurrent` rejects stale results.
+preserve the old generation. `isCurrent` rejects stale results using a private gate-issued generation
+record, so caller mutation of a result cannot revive it.
 
 **Reason:** Revisions represent host policy identity; generation provides cheap in-process staleness
 checks even when an adapter has no globally comparable revision ordering.

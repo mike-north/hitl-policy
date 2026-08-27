@@ -240,7 +240,9 @@ rewrite the operation or approval key retained for policy recheck, evidence veri
 Accepted timestamps leave enough safe-integer headroom for the maximum human timeout, so every
 validated request also has a representable deadline.
 Clock exceptions and accessor-backed provider registration fields normalize fail-closed without
-invocation; provider IDs and request methods are captured once before untrusted code runs.
+invocation; provider IDs and request methods are captured once before untrusted code runs. A
+`request` method may be an own data property or a normal prototype-defined class method; prototype
+accessors are never invoked.
 
 ### 2.4 Policy changes and gate
 
@@ -384,8 +386,11 @@ change batch is malformed or any preparation fails, the entire optional batch is
 
 1. `createGate` is synchronous and performs no load I/O. It installs `policy.initial` at generation
    zero, or starts in implicit ask when no policy is present.
-2. `evaluate` fills omitted request ID/time/timeout, rejects future timestamps, and captures the
-   current revision/generation. Invalid input invokes no adapter.
+2. `evaluate` validates, detaches, and deeply freezes the complete caller input before any host
+   callback or suspension. It then fills omitted request ID/time/timeout, rejects future timestamps,
+   and captures the current revision/generation. Invalid input invokes no adapter. Every later
+   callback and `result.input` receives the detached snapshot, so caller mutation cannot change the
+   operation after policy or human review.
 3. A policy allow or deny is terminal and never invokes HITL. Policy absence creates the implicit
    requirement. Policy ask uses its non-empty requirements.
 4. Requirements with equal authority, approval key, and compatible route coalesce. Different
@@ -403,8 +408,9 @@ change batch is malformed or any preparation fails, the entire optional batch is
 7. Approved policy changes are offered, prepared, and atomically applied only for the current
    generation, then cause one reload. A provider response batch is limited to 100 entries and the
    aggregate JSON boundary. Generation replacement is serialized with the host atomic `apply`
-   callback so it cannot change across that external write. Their effect is future-only; they never
-   change this result.
+   callback so it cannot change across that external write. A timeout or abort requests cancellation,
+   but an `apply` that ignores its signal retains the mutation barrier until its raw promise settles.
+   Their effect is future-only; they never change this result.
 8. A configured audit callback must succeed before returning satisfied. `isCurrent` remains a
    generation check, not a transaction lock.
 
@@ -416,14 +422,17 @@ same revision returns `unchanged` without incrementing. Failed load or invalid s
 `failed`, emits diagnostics, and retains the last good snapshot. Policy absence is a successful
 loaded state with `state: undefined`. Invalid per-call callback timeouts normalize to the bounded
 host callback default before `policy.load` is invoked, matching evaluation callback behavior.
-Reloads that arrive during a standing-policy atomic apply wait until that callback settles. The
-first subsequent load therefore observes the applied host state, and concurrent reload callers may
-coalesce with that post-apply load.
+Reloads that arrive during a standing-policy atomic apply wait until that callback's raw promise
+settles, including after a normalized callback timeout or caller abort. The first subsequent load
+therefore observes the applied host state, and concurrent reload callers may coalesce with that
+post-apply load. An adapter that ignores cancellation and never settles intentionally keeps this
+mutation barrier closed because the library cannot safely declare an external write finished.
 
 An in-flight approval from an old generation is reusable only when the current re-evaluation has
 matching obligations; any standing-policy selection attached to it is still discarded as stale.
-`isCurrent(result)` returns false after a later generation. After `evaluate` returns, an independent
-external change can still race execution.
+`isCurrent(result)` compares the generation recorded in the gate's private issued-result registry;
+mutating the public result object cannot revive stale work. It returns false after a later generation.
+After `evaluate` returns, an independent external change can still race execution.
 Hosts requiring strict atomicity must re-check or commit the returned generation with execution.
 
 ## 5. Failure and limits

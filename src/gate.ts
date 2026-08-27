@@ -85,6 +85,54 @@ function normalizeHumanTimeout(value: number | undefined): number {
     : 5 * 60_000;
 }
 
+/** Clones validated JSON into an immutable, prototype-safe internal snapshot. */
+function snapshotJson<TValue extends JsonValue>(value: TValue): TValue {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  const valueDescriptors = Object.getOwnPropertyDescriptors(value);
+  if (Array.isArray(value)) {
+    const copy: JsonValue[] = [];
+    for (let index = 0; index < value.length; index += 1) {
+      const descriptor = valueDescriptors[String(index)];
+      copy.push(snapshotJson(descriptor?.value as JsonValue));
+    }
+    return Object.freeze(copy) as TValue;
+  }
+  const copy: Record<string, JsonValue> = {};
+  for (const key of Object.keys(valueDescriptors)) {
+    const descriptor = valueDescriptors[key];
+    Object.defineProperty(copy, key, {
+      enumerable: true,
+      configurable: false,
+      writable: false,
+      value: snapshotJson(descriptor?.value as JsonValue),
+    });
+  }
+  return Object.freeze(copy) as TValue;
+}
+
+/** Detaches every retained input field before any host callback can suspend evaluation. */
+function snapshotGateInput<TOperation extends JsonValue>(
+  input: GateInput<TOperation>,
+): GateInput<TOperation> {
+  const caller = Object.freeze({
+    kind: input.caller.kind,
+    id: input.caller.id,
+    ...(input.caller.displayName === undefined ? {} : { displayName: input.caller.displayName }),
+  });
+  return Object.freeze({
+    ...(input.id === undefined ? {} : { id: input.id }),
+    operationId: input.operationId,
+    operation: snapshotJson(input.operation),
+    caller,
+    ...(input.riskClass === undefined ? {} : { riskClass: input.riskClass }),
+    ...(input.summary === undefined ? {} : { summary: input.summary }),
+    ...(input.requestedAtMs === undefined ? {} : { requestedAtMs: input.requestedAtMs }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+  });
+}
+
 /** Implements the unified state machine while keeping every host value opaque. */
 class GateImplementation<
   TOperation extends JsonValue,
@@ -93,7 +141,7 @@ class GateImplementation<
 > implements Gate<TOperation> {
   readonly #config: GateConfig<TOperation, TPolicy, TModification>;
   readonly #snapshots: SnapshotStore<GateInput<TOperation>, TPolicy>;
-  readonly #results = new WeakSet();
+  readonly #issuedGenerations = new WeakMap<object, number>();
   readonly #callbackTimeoutMs: number;
   readonly #humanTimeoutMs: number;
   #requestCounter = 0;
@@ -118,7 +166,7 @@ class GateImplementation<
   }
 
   isCurrent(result: GateResult<TOperation>): boolean {
-    return this.#results.has(result) && result.generation === this.generation;
+    return this.#issuedGenerations.get(result) === this.generation;
   }
 
   async evaluate(
@@ -147,6 +195,9 @@ class GateImplementation<
     if (!isGateInput(input)) {
       return this.#remember(this.#unsatisfied(input, 'invalid-input', failedPolicy(snapshot)));
     }
+    // Never retain caller-owned mutable data across policy, HITL, audit, or
+    // policy-change callbacks. Every later phase and the result use this copy.
+    input = snapshotGateInput(input);
     const clock = options.nowMs ?? this.#config.nowMs ?? Date.now;
     const nowMs = clock();
     if (!Number.isSafeInteger(nowMs) || nowMs < 0) {
@@ -475,7 +526,7 @@ class GateImplementation<
   }
 
   #remember<TResult extends GateResult<TOperation>>(result: TResult): TResult {
-    this.#results.add(result);
+    this.#issuedGenerations.set(result, result.generation);
     return result;
   }
 }

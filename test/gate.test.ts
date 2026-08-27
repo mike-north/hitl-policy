@@ -129,6 +129,51 @@ describe('createGate steel threads', () => {
     expect(nowMs).toHaveBeenCalledTimes(2);
     expect(request).not.toHaveBeenCalled();
   });
+
+  it('GATE-008 snapshots validated input before asynchronous evaluation', async () => {
+    const waiting = deferred<ReturnType<typeof approvedDecision>>();
+    const approval = hitl({ request: vi.fn(() => waiting.promise) });
+    const evaluate = vi.fn(async (_input: unknown) => askPolicy());
+    const audit = vi.fn(async () => true);
+    const gate = createGate({ policy: { evaluate }, hitl: approval, audit });
+    const input = makeInput() as {
+      operationId: string;
+      operation: { command: string; args: string[] };
+      caller: { kind: string; id: string };
+    };
+
+    const pending = gate.evaluate(input);
+    await vi.waitFor(() => expect(approval.request).toHaveBeenCalledOnce());
+
+    input.operationId = 'mutated-operation';
+    input.operation.command = 'rm';
+    input.operation.args[0] = '-rf';
+    input.caller.id = 'mutated-caller';
+    waiting.resolve(approvedDecision());
+
+    const result = await pending;
+    expect(result).toMatchObject({
+      state: 'satisfied',
+      input: {
+        operationId: 'operation-1',
+        operation: { command: 'echo', args: ['hello'] },
+        caller: { kind: 'agent', id: 'agent-1' },
+      },
+    });
+    expect(result.input).not.toBe(input);
+    expect(Object.isFrozen(result.input)).toBe(true);
+    expect(Object.isFrozen(result.input.operation)).toBe(true);
+    expect(evaluate).toHaveBeenCalledTimes(2);
+    expect(evaluate.mock.calls[1]?.[0]).toMatchObject({
+      operationId: 'operation-1',
+      operation: { command: 'echo', args: ['hello'] },
+    });
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({ operationId: 'operation-1' }),
+      }),
+    );
+  });
 });
 
 describe('reload snapshots and generation', () => {
@@ -233,6 +278,21 @@ describe('reload snapshots and generation', () => {
     await gate.reload();
     const result = await gate.evaluate(makeInput());
     await gate.reload();
+
+    expect(gate.isCurrent(result)).toBe(false);
+  });
+
+  it('RELOAD-008 isCurrent uses the generation issued by the gate, not mutable result data', async () => {
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce({ revision: 'r1', state: { mode: 'allow' } })
+      .mockResolvedValueOnce({ revision: 'r2', state: { mode: 'deny' } });
+    const gate = createGate({ policy: { load, evaluate: async () => policy('allow') } });
+    await gate.reload();
+    const result = await gate.evaluate(makeInput());
+    await gate.reload();
+
+    (result as { generation: number }).generation = gate.generation;
 
     expect(gate.isCurrent(result)).toBe(false);
   });
