@@ -1,4 +1,24 @@
-import type { DecisionFailure, DecisionResult } from '../src/index.ts';
+import { createGate } from '../src/index.ts';
+import type {
+  ApprovalRequirement,
+  AskPolicyEvaluation,
+  DecisionFailure,
+  DecisionResult,
+  GateConfig,
+  GateInput,
+  TerminalPolicyEvaluation,
+} from '../src/index.ts';
+
+export const NOW = 100_000;
+
+export function makeInput(overrides: Partial<GateInput> = {}): GateInput {
+  return {
+    operationId: 'operation-1',
+    operation: { command: 'echo', args: ['hello'] },
+    caller: { kind: 'agent', id: 'agent-1' },
+    ...overrides,
+  };
+}
 
 export function approvedDecision(evidence?: unknown): DecisionResult {
   return {
@@ -16,6 +36,41 @@ export function rejectedDecision(failure?: DecisionFailure): DecisionResult {
       ...(failure === undefined ? {} : { failure }),
     },
   };
+}
+
+export function askPolicy(
+  requirements: readonly [ApprovalRequirement, ...ApprovalRequirement[]] = [
+    { authorityId: 'authority-1', approvalKey: 'operation-1' },
+  ],
+): AskPolicyEvaluation {
+  return {
+    decision: 'ask' as const,
+    requirements,
+  };
+}
+
+export function policy(
+  decision: 'allow' | 'deny',
+  source: 'directive' | 'default' = 'directive',
+): TerminalPolicyEvaluation {
+  return { decision, source };
+}
+
+export function makeGateConfig(overrides: Record<string, unknown> = {}): GateConfig {
+  const config = {
+    policy: {
+      evaluate: async () => policy('allow'),
+    },
+    ...overrides,
+  };
+
+  // Runtime-boundary tests intentionally inject malformed provider and policy
+  // values that cannot be expressed through the public static contract.
+  return config;
+}
+
+export function makeGate(overrides: Record<string, unknown> = {}) {
+  return createGate(makeGateConfig(overrides));
 }
 
 export function deferred<T>() {

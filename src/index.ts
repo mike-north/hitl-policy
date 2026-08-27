@@ -5,6 +5,7 @@
  */
 
 export { invokeDecision } from './callbacks.js';
+export { createGate } from './gate.js';
 export {
   isApprovalRequirement,
   isCallerIdentity,
