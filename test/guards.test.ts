@@ -181,6 +181,21 @@ describe('L0 failure normalization', () => {
     expect(provider.request).not.toHaveBeenCalled();
   });
 
+  it('L0-004 accepts the maximum composable timestamp and rejects one over', () => {
+    const maximumTimestamp = Number.MAX_SAFE_INTEGER - LIMITS.maxHumanTimeoutMs;
+
+    expect(
+      isDecisionRequest(
+        request({ requestedAtMs: maximumTimestamp, timeoutMs: LIMITS.maxHumanTimeoutMs }),
+      ),
+    ).toBe(true);
+    expect(
+      isDecisionRequest(
+        request({ requestedAtMs: maximumTimestamp + 1, timeoutMs: LIMITS.maxHumanTimeoutMs }),
+      ),
+    ).toBe(false);
+  });
+
   it('L0-010 sends provider exceptions to diagnostics without leaking text', async () => {
     const error = new Error('secret provider implementation detail');
     const diagnostics = { report: vi.fn() };

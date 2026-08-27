@@ -85,7 +85,11 @@ function isBoundedString(value: unknown, max: number, allowEmpty = false): value
 
 function isSafeTimestamp(value: unknown): value is number {
   return (
-    typeof value === 'number' && Number.isSafeInteger(value) && Number.isFinite(value) && value >= 0
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= Number.MAX_SAFE_INTEGER - LIMITS.maxHumanTimeoutMs
   );
 }
 

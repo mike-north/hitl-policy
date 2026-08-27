@@ -237,6 +237,8 @@ the diagnostic sink. Approved cannot carry a failure; explicit rejection remains
 from provider/channel failure. A configured `verify` callback is a mandatory negative gate.
 Gate-created provider requests are detached, deeply frozen snapshots, so provider code cannot
 rewrite the operation or approval key retained for policy recheck, evidence verification, or audit.
+Accepted timestamps leave enough safe-integer headroom for the maximum human timeout, so every
+validated request also has a representable deadline.
 
 ### 2.4 Policy changes and gate
 

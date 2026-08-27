@@ -41,15 +41,15 @@ when it checks both the returned value and the absence/presence of forbidden sid
 
 ## Failure normalization and assurance
 
-| ID         | Requirement         | Expected assertion                                                                                                              |
-| ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| FAIL-001   | Never reject        | Provider throw, rejection, unavailable provider, and malformed output resolve unsatisfied with sanitized failure categories.    |
-| L0-004     | Deadline validation | Invalid, non-positive, non-integer, unsafe, or over-limit timeout returns timeout/invalid-request without calling the provider. |
-| L0-008     | API version         | Unknown provider `apiVersion` is unavailable and is not called.                                                                 |
-| L0-010     | Diagnostics         | Private provider exception text is absent from the returned result and reaches only the diagnostic sink.                        |
-| L0-011     | Opaque evidence     | Evidence retains reference identity and is never parsed, cloned, stringified, or normalized.                                    |
-| ASSURE-001 | Evidence gate       | Configured verification false/throw yields unsatisfied/evidence-failed.                                                         |
-| ASSURE-002 | Audit gate          | Configured audit false/throw yields unsatisfied/audit-failed.                                                                   |
+| ID         | Requirement         | Expected assertion                                                                                                                                               |
+| ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FAIL-001   | Never reject        | Provider throw, rejection, unavailable provider, and malformed output resolve unsatisfied with sanitized failure categories.                                     |
+| L0-004     | Deadline validation | Invalid, non-positive, non-integer, unsafe, or over-limit timeout, timestamp, or composed deadline returns timeout/invalid-request without calling the provider. |
+| L0-008     | API version         | Unknown provider `apiVersion` is unavailable and is not called.                                                                                                  |
+| L0-010     | Diagnostics         | Private provider exception text is absent from the returned result and reaches only the diagnostic sink.                                                         |
+| L0-011     | Opaque evidence     | Evidence retains reference identity and is never parsed, cloned, stringified, or normalized.                                                                     |
+| ASSURE-001 | Evidence gate       | Configured verification false/throw yields unsatisfied/evidence-failed.                                                                                          |
+| ASSURE-002 | Audit gate          | Configured audit false/throw yields unsatisfied/audit-failed.                                                                                                    |
 
 ## Policy recheck
 
