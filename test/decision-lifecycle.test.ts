@@ -161,6 +161,21 @@ describe('versioned decision boundary lifecycle', () => {
     expect(getterInvoked).toBe(false);
   });
 
+  it('L0-012 invokes a class provider whose request method is prototype-defined', async () => {
+    class ClassProvider {
+      readonly apiVersion = 1 as const;
+      readonly providerId = 'class-provider';
+
+      async request(): Promise<DecisionResult> {
+        return { schemaVersion: 1, decision: { state: 'approved' } };
+      }
+    }
+
+    await expect(
+      invokeDecision(new ClassProvider(), request(), { nowMs: () => NOW }),
+    ).resolves.toMatchObject({ decision: { state: 'approved' } });
+  });
+
   it('L0-010 retains captured provider identity after untrusted invocation mutates it', async () => {
     const providerError = new Error('private provider failure');
     const diagnostics = vi.fn();
