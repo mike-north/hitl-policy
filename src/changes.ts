@@ -181,7 +181,13 @@ export async function applyPolicyChanges<TOperation extends JsonValue, TModifica
               ...(options.revision === undefined ? {} : { revision: options.revision }),
             }),
           ),
-        { signal: controller.signal, timeoutMs: options.timeoutMs },
+        {
+          signal: controller.signal,
+          timeoutMs: options.timeoutMs,
+          // An external write that ignores cancellation is still live. Keep it
+          // inside the snapshot mutation barrier until its promise settles.
+          waitForLateSettlement: true,
+        },
       );
       if (applied.status !== 'completed') {
         if (applied.status === 'failed') {
