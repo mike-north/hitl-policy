@@ -61,6 +61,9 @@ export interface CallerIdentity {
 }
 
 // @public
+export function createGate<TOperation extends JsonValue = JsonValue, TPolicy = unknown, TModification = unknown>(config: GateConfig<TOperation, TPolicy, TModification>): Gate<TOperation>;
+
+// @public
 export type DecisionFailure = 'invalid-request' | 'provider-error' | 'provider-unavailable' | 'malformed-result' | 'caller-aborted' | 'deadline-exceeded';
 
 // @public
