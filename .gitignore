@@ -47,6 +47,9 @@ web_modules/
 # TypeScript cache
 *.tsbuildinfo
 
+# API Extractor working files (the reviewed API report is committed separately)
+temp/
+
 # Optional npm cache directory
 .npm
 
