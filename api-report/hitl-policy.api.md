@@ -171,7 +171,6 @@ export interface Gate<TOperation extends JsonValue = JsonValue> {
     evaluate(input: GateInput<TOperation>, options?: GateEvaluationOptions): Promise<GateResult<TOperation>>;
     // (undocumented)
     readonly generation: number;
-    // (undocumented)
     isCurrent(result: GateResult<TOperation>): boolean;
     // (undocumented)
     reload(options?: ReloadOptions): Promise<ReloadResult>;
@@ -494,7 +493,6 @@ export interface SatisfiedGateResult<TOperation extends JsonValue = JsonValue> {
     readonly generation: number;
     // (undocumented)
     readonly human?: HumanResolution;
-    // (undocumented)
     readonly input: GateInput<TOperation>;
     // (undocumented)
     readonly policy: PolicyResolution;
@@ -523,7 +521,6 @@ export interface UnsatisfiedGateResult<TOperation extends JsonValue = JsonValue>
     readonly generation: number;
     // (undocumented)
     readonly human?: HumanResolution;
-    // (undocumented)
     readonly input: GateInput<TOperation>;
     // (undocumented)
     readonly policy: PolicyResolution;

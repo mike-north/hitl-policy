@@ -185,6 +185,8 @@ export interface ApprovalDecisionRequest<
 
 /**
  * Host input from which the gate builds bounded provider requests lazily.
+ * A valid input is detached and deeply frozen before asynchronous evaluation;
+ * every callback and returned result observes that internal snapshot.
  *
  * @public
  */
@@ -520,6 +522,7 @@ export type GateFailure =
  */
 export interface SatisfiedGateResult<TOperation extends JsonValue = JsonValue> {
   readonly state: 'satisfied';
+  /** Detached immutable input which was actually evaluated and approved. */
   readonly input: GateInput<TOperation>;
   readonly generation: number;
   readonly revision?: string;
@@ -535,6 +538,7 @@ export interface SatisfiedGateResult<TOperation extends JsonValue = JsonValue> {
 export interface UnsatisfiedGateResult<TOperation extends JsonValue = JsonValue> {
   readonly state: 'unsatisfied';
   readonly failure: GateFailure;
+  /** Detached immutable input used by the evaluation, when validation succeeded. */
   readonly input: GateInput<TOperation>;
   readonly generation: number;
   readonly revision?: string;
@@ -636,5 +640,6 @@ export interface Gate<TOperation extends JsonValue = JsonValue> {
     options?: GateEvaluationOptions,
   ): Promise<GateResult<TOperation>>;
   reload(options?: ReloadOptions): Promise<ReloadResult>;
+  /** Checks the gate-issued generation, not caller-mutable result properties. */
   isCurrent(result: GateResult<TOperation>): boolean;
 }

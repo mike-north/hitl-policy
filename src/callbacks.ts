@@ -48,6 +48,11 @@ export async function runHostCallback<T>(
   options: {
     readonly signal?: AbortSignal;
     readonly timeoutMs: number;
+    /**
+     * Keeps a surrounding mutation barrier held until the raw callback settles,
+     * even when its normalized result has already timed out or been aborted.
+     */
+    readonly waitForLateSettlement?: boolean;
   },
 ): Promise<CallbackResult<T>> {
   if (options.signal?.aborted === true) {
@@ -63,7 +68,8 @@ export async function runHostCallback<T>(
   }
 
   const controller = new AbortController();
-  return await new Promise<CallbackResult<T>>((resolve) => {
+  let callbackSettlement: Promise<void> | undefined;
+  const result = await new Promise<CallbackResult<T>>((resolve) => {
     let settled = false;
     const finish = (result: CallbackResult<T>): void => {
       if (settled) {
@@ -85,7 +91,15 @@ export async function runHostCallback<T>(
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
-      Promise.resolve(callback(controller.signal)).then(
+      const callbackPromise = Promise.resolve(callback(controller.signal));
+      // Observe the raw promise independently from the bounded result. Mutation
+      // callers use this tail to prevent a timed-out external write from
+      // escaping the snapshot serialization boundary while it is still live.
+      callbackSettlement = callbackPromise.then(
+        () => undefined,
+        () => undefined,
+      );
+      callbackPromise.then(
         (value) => {
           finish({ status: 'completed', value });
         },
@@ -97,6 +111,10 @@ export async function runHostCallback<T>(
       finish({ status: 'failed', error });
     }
   });
+  if (options.waitForLateSettlement === true && callbackSettlement !== undefined) {
+    await callbackSettlement;
+  }
+  return result;
 }
 
 function normalizedDecision(
@@ -139,6 +157,23 @@ function readOwnDataProperty(value: object, key: PropertyKey): unknown {
   } catch {
     return undefined;
   }
+}
+
+/** Reads a class method without invoking accessors anywhere in its prototype chain. */
+function readPrototypeDataMethod(value: object, key: PropertyKey): unknown {
+  let current: object | null = value;
+  try {
+    while (current !== null && current !== Object.prototype) {
+      const descriptor = Object.getOwnPropertyDescriptor(current, key);
+      if (descriptor !== undefined) {
+        return 'value' in descriptor ? descriptor.value : undefined;
+      }
+      current = Object.getPrototypeOf(current) as object | null;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function normalizeProviderResult(value: unknown): DecisionResult | undefined {
@@ -209,12 +244,12 @@ export async function invokeDecision(
   if (typeof provider !== 'object' || provider === null) {
     return normalizedDecision('rejected', 'provider-unavailable');
   }
-  // Provider registration is untrusted boundary data. Read own descriptors
-  // exactly once so accessors and hostile descriptor traps cannot run here or
-  // be re-read after provider code mutates its registration object.
+  // Provider registration is untrusted boundary data. Read descriptors exactly
+  // once so accessors cannot run here or be re-read after provider code mutates
+  // its registration object. A normal class method may live on a prototype.
   const apiVersion = readOwnDataProperty(provider, 'apiVersion');
   const providerId = readOwnDataProperty(provider, 'providerId');
-  const requestMethod = readOwnDataProperty(provider, 'request');
+  const requestMethod = readPrototypeDataMethod(provider, 'request');
   if (
     apiVersion !== 1 ||
     typeof providerId !== 'string' ||
