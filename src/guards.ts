@@ -161,9 +161,12 @@ function visitJson(
       ancestors.delete(value);
       return false;
     }
-    budget.strings += key.length;
+    // The child budget is the shared cumulative state for this object walk.
+    // Account for each key before visiting its value so sibling and nested keys
+    // cannot be lost when the child state is copied back to the parent budget.
+    nextBudget.strings += key.length;
     if (
-      budget.strings > LIMITS.maxStringCodeUnits ||
+      nextBudget.strings > LIMITS.maxStringCodeUnits ||
       !visitJson(descriptor.value, nextBudget, ancestors)
     ) {
       ancestors.delete(value);

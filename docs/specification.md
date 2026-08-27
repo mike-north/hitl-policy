@@ -405,7 +405,8 @@ change batch is malformed or any preparation fails, the entire optional batch is
 load with a changed host revision returns `updated` and increments generation exactly once. The
 same revision returns `unchanged` without incrementing. Failed load or invalid state returns
 `failed`, emits diagnostics, and retains the last good snapshot. Policy absence is a successful
-loaded state with `state: undefined`.
+loaded state with `state: undefined`. Invalid per-call callback timeouts normalize to the bounded
+host callback default before `policy.load` is invoked, matching evaluation callback behavior.
 
 An in-flight approval from an old generation is reusable only when the current re-evaluation has
 matching obligations; any standing-policy selection attached to it is still discarded as stale.

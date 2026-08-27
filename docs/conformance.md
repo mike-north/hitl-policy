@@ -36,6 +36,7 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | RELOAD-004 | Successful absence   | A loaded snapshot with undefined state replaces policy with implicit ask and increments generation when its revision changes.      |
 | RELOAD-005 | Concurrent reload    | Concurrent `reload()` calls coalesce to one adapter load and the same result/generation.                                           |
 | RELOAD-006 | Stale results        | `gate.isCurrent(result)` rejects a result from an older generation and accepts a current result.                                   |
+| RELOAD-007 | Callback timeout     | Invalid per-call reload callback timeouts normalize to the bounded host default before invoking `policy.load`.                     |
 
 ## Failure normalization and assurance
 

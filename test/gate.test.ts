@@ -212,6 +212,20 @@ describe('reload snapshots and generation', () => {
 
     expect(gate.isCurrent(result)).toBe(false);
   });
+
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 60_001])(
+    'RELOAD-007 normalizes invalid per-call callback timeout %s before loading',
+    async (callbackTimeoutMs) => {
+      const load = vi.fn(async () => ({ revision: 'r1', state: { mode: 'allow' } }));
+      const gate = createGate({ policy: { load, evaluate: async () => policy('allow') } });
+
+      await expect(gate.reload({ callbackTimeoutMs })).resolves.toMatchObject({
+        status: 'updated',
+        generation: 1,
+      });
+      expect(load).toHaveBeenCalledOnce();
+    },
+  );
 });
 
 describe('never-reject and assurance gates', () => {

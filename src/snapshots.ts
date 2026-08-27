@@ -103,7 +103,7 @@ export class SnapshotStore<TInput, TPolicy> {
     }
     const load = adapter.load.bind(adapter);
     const captured = this.#snapshot;
-    const timeoutMs = options.callbackTimeoutMs ?? this.#defaultTimeoutMs;
+    const timeoutMs = normalizeCallbackTimeout(options.callbackTimeoutMs ?? this.#defaultTimeoutMs);
     const loaded = await runHostCallback(
       (signal) => load({ signal, generation: captured.generation }),
       { ...(options.signal === undefined ? {} : { signal: options.signal }), timeoutMs },
@@ -169,7 +169,7 @@ export class SnapshotStore<TInput, TPolicy> {
   }
 }
 
-/** Validates a configured host callback timeout without silently widening it. */
+/** Normalizes an invalid host callback timeout to the bounded safe default. */
 export function normalizeCallbackTimeout(value: number | undefined): number {
   return value !== undefined &&
     Number.isSafeInteger(value) &&

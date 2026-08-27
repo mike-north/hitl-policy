@@ -47,6 +47,20 @@ describe('G-001/G-002/G-003 bounded boundary guards', () => {
     expect(LIMITS.maxObjectKeys).toBe(10_000);
   });
 
+  it('G-001 counts object-key code units cumulatively across siblings', () => {
+    const exact = {
+      ['a'.repeat(LIMITS.maxStringCodeUnits / 2)]: 0,
+      ['b'.repeat(LIMITS.maxStringCodeUnits / 2)]: 0,
+    };
+    const overLimit = {
+      ['a'.repeat(LIMITS.maxStringCodeUnits / 2 + 1)]: 0,
+      ['b'.repeat(LIMITS.maxStringCodeUnits / 2 + 1)]: 0,
+    };
+
+    expect(isJsonValue(exact)).toBe(true);
+    expect(isJsonValue(overLimit)).toBe(false);
+  });
+
   it('G-002 rejects cycles, accessors, functions, symbols, class instances, and non-finite numbers', () => {
     expect(isJsonValue(cyclicValue())).toBe(false);
     expect(isJsonValue(() => undefined)).toBe(false);
