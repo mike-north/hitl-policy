@@ -176,6 +176,11 @@ New or changed obligations return `policy-changed` without an automatic second p
 after it returns and before execution. Strict hosts must compare or commit the generation in the
 same host-owned operation that performs the action.
 
+`evaluate` detaches and deeply freezes a valid input before calling policy, HITL, audit, or
+policy-change adapters. Use `result.input.operation` for execution: it is the exact immutable
+operation the gate evaluated, even if the caller later mutates its original object. `isCurrent`
+uses the generation privately recorded when that result was issued, not a caller-writable field.
+
 ## Host-authorized standing-policy changes
 
 Providers may select host-authored choices or edit a host-authored namespaced JSON draft. Their

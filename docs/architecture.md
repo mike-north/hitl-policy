@@ -23,7 +23,8 @@ src/
 are the sole additional public entrypoint.
 
 Production code has zero runtime dependencies and uses only portable ECMAScript primitives and
-`AbortSignal`. It must run under Node, browser, and worker-like runtimes without filesystem,
+`AbortSignal`. Valid gate inputs are copied into deeply frozen internal snapshots before host
+callbacks run. It must run under Node, browser, and worker-like runtimes without filesystem,
 network, crypto, native-binary, or WASM dependencies. Evidence, diagnostics, and host policy
 state remain local opaque values and are not serialized by this package.
 
@@ -32,11 +33,12 @@ state remain local opaque values and are not serialized by this package.
 `createGate` is synchronous and performs no I/O. A `PolicyAdapter` owns loading and exposes an
 optional generation-0 `initial` snapshot plus an async `load`. `Gate.reload()` serializes concurrent
 loads, installs only a validated complete snapshot, increments generation only when the host
-revision changes, and preserves the last good snapshot after failure. `Gate.isCurrent(result)` is
-the host's generation check for an evaluation result.
+revision changes, and preserves the last good snapshot after failure. `Gate.isCurrent(result)` uses
+a private issued-generation registry rather than trusting mutable result fields.
 
 An evaluation captures the current snapshot, runs policy, optionally requests human decisions,
-and re-evaluates after approval. Matching authority/key/route obligations may reuse the in-flight
+and re-evaluates after approval using the same detached input. Matching authority/key/route
+obligations may reuse the in-flight
 approval across a generation change; new or changed obligations fail without re-prompting. It may
 still race an external change after returning, so callers needing atomic execution must bind a
 generation check to execution.

@@ -29,18 +29,20 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | GATE-005 | Mixed terminal    | Mixed allow/deny never invokes HITL and maps to satisfied/unsatisfied respectively.                                                                                                                         |
 | GATE-006 | Mixed ask         | Ask invokes HITL; approval may satisfy the gate but does not rewrite the retained policy result to allow.                                                                                                   |
 | GATE-007 | Fresh deadline    | The gate re-reads its clock immediately before provider invocation while preserving the request's original timestamp, so work that expires during policy/change-offer callbacks never reaches the provider. |
+| GATE-008 | Input snapshot    | A valid caller input is detached and deeply frozen before asynchronous work; later caller mutation cannot change policy rechecks, audit, policy changes, or `result.input`.                                 |
 
 ## Reload and generation
 
-| ID         | Requirement          | Expected assertion                                                                                                                 |
-| ---------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| RELOAD-001 | Synchronous creation | `createGate` performs no load I/O and exposes generation 0 immediately.                                                            |
-| RELOAD-002 | Revision identity    | A changed loaded revision returns `updated` and increments generation; same revision returns `unchanged` and preserves generation. |
-| RELOAD-003 | Last good snapshot   | Load rejection returns sanitized `failed`, emits diagnostics, and leaves the prior policy active.                                  |
-| RELOAD-004 | Successful absence   | A loaded snapshot with undefined state replaces policy with implicit ask and increments generation when its revision changes.      |
-| RELOAD-005 | Concurrent reload    | Concurrent `reload()` calls coalesce to one adapter load and the same result/generation.                                           |
-| RELOAD-006 | Stale results        | `gate.isCurrent(result)` rejects a result from an older generation and accepts a current result.                                   |
-| RELOAD-007 | Callback timeout     | Invalid per-call reload callback timeouts normalize to the bounded host default before invoking `policy.load`.                     |
+| ID         | Requirement          | Expected assertion                                                                                                                      |
+| ---------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| RELOAD-001 | Synchronous creation | `createGate` performs no load I/O and exposes generation 0 immediately.                                                                 |
+| RELOAD-002 | Revision identity    | A changed loaded revision returns `updated` and increments generation; same revision returns `unchanged` and preserves generation.      |
+| RELOAD-003 | Last good snapshot   | Load rejection returns sanitized `failed`, emits diagnostics, and leaves the prior policy active.                                       |
+| RELOAD-004 | Successful absence   | A loaded snapshot with undefined state replaces policy with implicit ask and increments generation when its revision changes.           |
+| RELOAD-005 | Concurrent reload    | Concurrent `reload()` calls coalesce to one adapter load and the same result/generation.                                                |
+| RELOAD-006 | Stale results        | `gate.isCurrent(result)` rejects a result from an older generation and accepts a current result.                                        |
+| RELOAD-007 | Callback timeout     | Invalid per-call reload callback timeouts normalize to the bounded host default before invoking `policy.load`.                          |
+| RELOAD-008 | Issued generation    | `isCurrent` uses the generation recorded when the gate issued the result, so mutating a returned `generation` cannot revive stale work. |
 
 ## Failure normalization and assurance
 
@@ -52,6 +54,7 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | L0-008     | API version         | Unknown provider `apiVersion` is unavailable and is not called.                                                                                                  |
 | L0-010     | Diagnostics         | Private provider exception text is absent from the returned result and reaches only the diagnostic sink.                                                         |
 | L0-011     | Opaque evidence     | Evidence retains reference identity and is never parsed, cloned, stringified, or normalized.                                                                     |
+| L0-012     | Class providers     | A provider method defined as a normal prototype class method is captured without invoking accessors and remains callable.                                        |
 | ASSURE-001 | Evidence gate       | Configured verification false/throw yields unsatisfied/evidence-failed.                                                                                          |
 | ASSURE-002 | Audit gate          | Configured audit false/throw yields unsatisfied/audit-failed.                                                                                                    |
 
@@ -78,6 +81,7 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | CHANGE-008 | Reload independence | A failed reload after successful atomic apply does not change the already-computed one-shot result.                                                                                      |
 | CHANGE-009 | Bounded batch       | At most 100 policy-change responses are retained, and the complete batch must fit the aggregate JSON boundary; an oversized batch is discarded without changing the one-shot decision.   |
 | CHANGE-010 | Apply serialization | Snapshot generation cannot advance while the host atomic `apply` callback runs; a concurrent reload waits and then observes the applied policy instead of coalescing with stale loading. |
+| CHANGE-011 | Late apply          | A timed-out or aborted `apply` that ignores cancellation remains inside the mutation barrier until its raw promise settles; queued reloads cannot observe pre-apply state.               |
 
 ## Multi-authority and host boundaries
 
@@ -90,8 +94,8 @@ are adapter-owned tests because they are not implemented by this package.
 ## Issue traceability
 
 The issue's package/export criteria map to `G-004..009`; L0 normalization to `L0-004`,
-`L0-008`, `L0-010`, `L0-011`, and `FAIL-001..002`; policy-only/HITL/mixed behavior to `GATE-001..007`;
-reload to `RELOAD-001..007`; assurance to `ASSURE-001..002`; policy re-evaluation to
-`RECHECK-001..004`; and policy changes to `CHANGE-001..010`. The remaining issue documentation and
+`L0-008`, `L0-010..012`, and `FAIL-001..002`; policy-only/HITL/mixed behavior to `GATE-001..008`;
+reload to `RELOAD-001..008`; assurance to `ASSURE-001..002`; policy re-evaluation to
+`RECHECK-001..004`; and policy changes to `CHANGE-001..011`. The remaining issue documentation and
 release criteria are checked by the package-boundary, built-portability, README, and release-policy
 tests. No allw integration is required for core package conformance.
