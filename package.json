@@ -41,8 +41,9 @@
     "check:package": "publint",
     "fix:format": "prettier --write .",
     "fix:lint": "eslint . --fix",
-    "test": "pnpm run test:unit && pnpm run test:package",
+    "test": "pnpm run test:unit && pnpm run test:types && pnpm run test:package",
     "test:unit": "vitest run",
+    "test:types": "pnpm run build && tsd --files 'test-d/**/*.test-d.ts'",
     "test:package": "pnpm run build && attw --pack . --profile esm-only"
   },
   "devDependencies": {
@@ -57,6 +58,7 @@
     "tsup": "^8.5.1",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.68.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "tsd": "^0.31.2"
   }
 }
