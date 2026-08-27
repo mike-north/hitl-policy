@@ -33,10 +33,11 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "pnpm run check:format && pnpm run check:lint && pnpm run check:typecheck && pnpm run check:package",
+    "check": "pnpm run check:format && pnpm run check:lint && pnpm run check:typecheck && pnpm run check:api && pnpm run check:package",
     "check:format": "prettier --check .",
     "check:lint": "eslint .",
     "check:typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "check:api": "api-extractor run",
     "check:package": "publint",
     "fix:format": "prettier --write .",
     "fix:lint": "eslint . --fix",
@@ -47,6 +48,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@eslint/js": "^10.0.1",
+    "@microsoft/api-extractor": "^7.59.0",
     "@types/node": "^24.0.0",
     "eslint": "10.9.1",
     "eslint-config-prettier": "^10.1.8",
