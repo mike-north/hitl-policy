@@ -1,13 +1,70 @@
 {
   "name": "hitl-policy",
   "version": "0.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "description": "Policy primitives for human-in-the-loop decisions",
+  "author": "Mike North <michael.l.north@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=24"
   },
-  "keywords": [],
-  "author": "",
-  "license": "UNLICENSED",
-  "type": "module"
+  "packageManager": "pnpm@11.12.0",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./conformance": {
+      "types": "./dist/conformance.d.ts",
+      "import": "./dist/conformance.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "check": "pnpm run check:format && pnpm run check:lint && pnpm run check:typecheck && pnpm run check:api && pnpm run check:package && pnpm run check:release-policy",
+    "check:format": "prettier --check .",
+    "check:lint": "eslint .",
+    "check:typecheck": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "check:api": "api-extractor run",
+    "check:package": "publint",
+    "check:release-policy": "node scripts/check-release-policy.mjs",
+    "fix:format": "prettier --write .",
+    "fix:lint": "eslint . --fix",
+    "test": "pnpm run test:unit && pnpm run test:types && pnpm run test:package",
+    "test:unit": "vitest run",
+    "test:types": "pnpm run build && tsd --files 'test-d/**/*.test-d.ts'",
+    "test:package": "attw --pack . --profile esm-only",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "pnpm build && changeset publish",
+    "prepublishOnly": "pnpm run check:release-policy"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
+    "@changesets/cli": "^3.0.1",
+    "@eslint/js": "^10.0.1",
+    "@microsoft/api-extractor": "^7.59.0",
+    "@types/node": "^24.0.0",
+    "eslint": "10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "publint": "^0.3.24",
+    "tsup": "^8.5.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11",
+    "tsd": "^0.31.2"
+  }
 }
