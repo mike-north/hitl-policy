@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { approvedDecision, askPolicy, deferred, makeGate, makeInput } from './helpers.ts';
 
 function changeAdapter(overrides: Record<string, unknown> = {}) {
@@ -12,6 +12,10 @@ function changeAdapter(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('policy modification choices and edits', () => {
   it('CHANGE-001 offers host-authored choices and atomically applies multiple selected modifications', async () => {
@@ -290,5 +294,54 @@ describe('policy modification choices and edits', () => {
     });
     expect(load).toHaveBeenCalledOnce();
     expect(gate.generation).toBe(1);
+  });
+
+  it('CHANGE-011 keeps a timed-out late apply inside the snapshot mutation boundary', async () => {
+    vi.useFakeTimers();
+    const applyStarted = deferred<undefined>();
+    const releaseApply = deferred<undefined>();
+    let revision = 'r1';
+    const changes = changeAdapter({
+      apply: vi.fn(async () => {
+        applyStarted.resolve(undefined);
+        await releaseApply.promise;
+        revision = 'r2';
+        return true;
+      }),
+    });
+    const load = vi.fn(async () => ({ revision, state: { mode: 'ask' } }));
+    const approval = {
+      implicitRequirement: { authorityId: 'authority-1', approvalKey: 'operation-1' },
+      request: vi.fn(async () => ({
+        ...approvedDecision(),
+        policyChanges: [{ schemaVersion: 1, type: 'choice', optionId: 'allow-read' }],
+      })),
+    };
+    const gate = makeGate({
+      policy: {
+        initial: { revision, state: { mode: 'ask' } },
+        load,
+        evaluate: async () => askPolicy(),
+      },
+      hitl: approval,
+      policyChanges: changes,
+    });
+
+    const evaluation = gate.evaluate(makeInput(), { callbackTimeoutMs: 10 });
+    await applyStarted.promise;
+    const concurrentReload = gate.reload();
+    await vi.advanceTimersByTimeAsync(10);
+
+    expect(load).not.toHaveBeenCalled();
+    revision = 'r2';
+    releaseApply.resolve(undefined);
+
+    await expect(evaluation).resolves.toMatchObject({ state: 'satisfied', generation: 0 });
+    await expect(concurrentReload).resolves.toMatchObject({
+      status: 'updated',
+      generation: 1,
+      revision: 'r2',
+    });
+    expect(load).toHaveBeenCalledOnce();
   });
 });
