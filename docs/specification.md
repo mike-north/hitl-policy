@@ -239,6 +239,8 @@ Gate-created provider requests are detached, deeply frozen snapshots, so provide
 rewrite the operation or approval key retained for policy recheck, evidence verification, or audit.
 Accepted timestamps leave enough safe-integer headroom for the maximum human timeout, so every
 validated request also has a representable deadline.
+Clock exceptions and accessor-backed provider registration fields normalize fail-closed without
+invocation; provider IDs and request methods are captured once before untrusted code runs.
 
 ### 2.4 Policy changes and gate
 

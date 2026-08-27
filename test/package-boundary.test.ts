@@ -9,6 +9,9 @@ const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), '
   exports?: Record<string, unknown>;
   dependencies?: Record<string, string>;
 };
+const tsconfig = JSON.parse(readFileSync(join(projectRoot, 'tsconfig.json'), 'utf8')) as {
+  compilerOptions?: { allowJs?: boolean; checkJs?: boolean };
+};
 
 describe('G-005 package boundary', () => {
   it('publishes one root integration surface and the conformance subpath', () => {
@@ -50,5 +53,9 @@ describe('G-005 package boundary', () => {
       expect(source).not.toMatch(/from ['"]node:|require\(|\.node['"]|\.wasm['"]/);
       await expect(import(join(dist, entry))).resolves.toBeTypeOf('object');
     }
+  });
+
+  it('G-007 typechecks included JavaScript configuration and release scripts', () => {
+    expect(tsconfig.compilerOptions).toMatchObject({ allowJs: true, checkJs: true });
   });
 });

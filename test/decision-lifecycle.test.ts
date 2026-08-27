@@ -121,6 +121,80 @@ describe('versioned decision boundary lifecycle', () => {
     expect(childSignal?.aborted).toBe(false);
   });
 
+  it('FAIL-002 normalizes a throwing invocation clock without calling the provider', async () => {
+    const decisionProvider = provider(async () => ({
+      schemaVersion: 1,
+      decision: { state: 'approved' },
+    }));
+
+    await expect(
+      invokeDecision(decisionProvider, request(), {
+        nowMs: () => {
+          throw new Error('clock unavailable');
+        },
+      }),
+    ).resolves.toMatchObject({
+      decision: { state: 'timeout', failure: 'invalid-request' },
+    });
+    expect(decisionProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('FAIL-002 rejects accessor-backed provider registration without reading it', async () => {
+    let getterInvoked = false;
+    const untrustedProvider = Object.defineProperty(
+      { apiVersion: 1, providerId: 'provider-1' },
+      'request',
+      {
+        enumerable: true,
+        get() {
+          getterInvoked = true;
+          throw new Error('provider accessor must not run');
+        },
+      },
+    );
+
+    await expect(
+      invokeDecision(untrustedProvider as never, request(), { nowMs: () => NOW }),
+    ).resolves.toMatchObject({
+      decision: { state: 'rejected', failure: 'provider-unavailable' },
+    });
+    expect(getterInvoked).toBe(false);
+  });
+
+  it('L0-010 retains captured provider identity after untrusted invocation mutates it', async () => {
+    const providerError = new Error('private provider failure');
+    const diagnostics = vi.fn();
+    let getterInvoked = false;
+    const mutatingProvider = {
+      apiVersion: 1,
+      providerId: 'provider-1',
+      request: vi.fn(async function (this: Record<string, unknown>) {
+        Object.defineProperty(this, 'providerId', {
+          configurable: true,
+          get() {
+            getterInvoked = true;
+            throw new Error('mutated provider ID accessor must not run');
+          },
+        });
+        throw providerError;
+      }),
+    };
+
+    await expect(
+      invokeDecision(mutatingProvider as never, request(), {
+        diagnostics,
+        nowMs: () => NOW,
+      }),
+    ).resolves.toMatchObject({
+      decision: { state: 'rejected', failure: 'provider-error' },
+    });
+    expect(getterInvoked).toBe(false);
+    expect(diagnostics).toHaveBeenCalledWith(
+      providerError,
+      expect.objectContaining({ providerId: 'provider-1' }),
+    );
+  });
+
   it('CHANGE-004 keeps a valid one-shot decision when optional changes are malformed', async () => {
     const decisionProvider = provider(async () => ({
       schemaVersion: 1,

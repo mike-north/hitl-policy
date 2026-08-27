@@ -14,6 +14,7 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | G-004 | Runtime schemas | Schema version 1 is accepted; missing/unknown versions and discriminants fail closed on every exchanged envelope.                                                                                    |
 | G-005 | Export boundary | `package.json` exports `.`, `./conformance`, and package metadata only; old L0–L3 paths are absent.                                                                                                  |
 | G-006 | Portable build  | Built root and conformance declarations import without filesystem, network, crypto, native, or WASM dependencies in Node and a browser/worker-like runtime.                                          |
+| G-007 | JS typecheck    | Root TypeScript checking includes and checks JavaScript configuration and release-script inputs rather than silently ignoring the included files.                                                    |
 
 ## Steel threads
 
@@ -44,6 +45,7 @@ when it checks both the returned value and the absence/presence of forbidden sid
 | ID         | Requirement         | Expected assertion                                                                                                                                               |
 | ---------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | FAIL-001   | Never reject        | Provider throw, rejection, unavailable provider, and malformed output resolve unsatisfied with sanitized failure categories.                                     |
+| FAIL-002   | Hostile callbacks   | A throwing clock or accessor-backed provider registration settles fail-closed without invoking the provider, reading the accessor, or rejecting.                 |
 | L0-004     | Deadline validation | Invalid, non-positive, non-integer, unsafe, or over-limit timeout, timestamp, or composed deadline returns timeout/invalid-request without calling the provider. |
 | L0-008     | API version         | Unknown provider `apiVersion` is unavailable and is not called.                                                                                                  |
 | L0-010     | Diagnostics         | Private provider exception text is absent from the returned result and reaches only the diagnostic sink.                                                         |
@@ -85,8 +87,8 @@ are adapter-owned tests because they are not implemented by this package.
 
 ## Issue traceability
 
-The issue's package/export criteria map to `G-004..006`; L0 normalization to `L0-004`,
-`L0-008`, `L0-010`, `L0-011`, and `FAIL-001`; policy-only/HITL/mixed behavior to `GATE-001..006`;
+The issue's package/export criteria map to `G-004..007`; L0 normalization to `L0-004`,
+`L0-008`, `L0-010`, `L0-011`, and `FAIL-001..002`; policy-only/HITL/mixed behavior to `GATE-001..007`;
 reload to `RELOAD-001..007`; assurance to `ASSURE-001..002`; policy re-evaluation to
 `RECHECK-001..004`; and policy changes to `CHANGE-001..010`. The remaining issue documentation and
 release criteria are checked by the package-boundary, built-portability, README, and release-policy

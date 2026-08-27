@@ -181,7 +181,12 @@ export async function invokeDecision(
   request: unknown,
   options: DecisionInvocationOptions = {},
 ): Promise<DecisionResult> {
-  const now = options.nowMs?.() ?? Date.now();
+  let now: number;
+  try {
+    now = options.nowMs?.() ?? Date.now();
+  } catch {
+    return normalizedDecision('timeout', 'invalid-request');
+  }
   if (!isDecisionRequest(request)) {
     return requestHasDeadlineShape(request)
       ? normalizedDecision('timeout', 'invalid-request')
@@ -204,12 +209,16 @@ export async function invokeDecision(
   if (typeof provider !== 'object' || provider === null) {
     return normalizedDecision('rejected', 'provider-unavailable');
   }
-  const providerRecord = provider as Record<string, unknown>;
-  const requestMethod = providerRecord.request;
+  // Provider registration is untrusted boundary data. Read own descriptors
+  // exactly once so accessors and hostile descriptor traps cannot run here or
+  // be re-read after provider code mutates its registration object.
+  const apiVersion = readOwnDataProperty(provider, 'apiVersion');
+  const providerId = readOwnDataProperty(provider, 'providerId');
+  const requestMethod = readOwnDataProperty(provider, 'request');
   if (
-    providerRecord.apiVersion !== 1 ||
-    typeof providerRecord.providerId !== 'string' ||
-    providerRecord.providerId.length === 0 ||
+    apiVersion !== 1 ||
+    typeof providerId !== 'string' ||
+    providerId.length === 0 ||
     typeof requestMethod !== 'function'
   ) {
     return normalizedDecision('rejected', 'provider-unavailable');
@@ -255,7 +264,7 @@ export async function invokeDecision(
         (error: unknown) => {
           reportDiagnostic(options.diagnostics, error, {
             phase: 'invoke',
-            providerId: providerRecord.providerId as string,
+            providerId,
             requestId: request.id,
           });
           finish(normalizedDecision('rejected', 'provider-error'));
@@ -264,7 +273,7 @@ export async function invokeDecision(
     } catch (error: unknown) {
       reportDiagnostic(options.diagnostics, error, {
         phase: 'invoke',
-        providerId: providerRecord.providerId as string,
+        providerId,
         requestId: request.id,
       });
       finish(normalizedDecision('rejected', 'provider-error'));

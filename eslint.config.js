@@ -19,9 +19,9 @@ export default defineConfig(
   {
     languageOptions: {
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ['*.config.js', 'scripts/*.mjs'],
-        },
+        // JavaScript configuration and release scripts are part of the root
+        // TypeScript project, so ESLint must use that same checked program.
+        projectService: true,
         tsconfigRootDir: import.meta.dirname,
       },
     },
